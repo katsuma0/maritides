@@ -75,8 +75,9 @@ the span.
 
 ## Deploying
 
-Pushes to `main` publish via `.github/workflows/pages.yml`. In the repository
-settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
+Pushes to `main` publish via `.github/workflows/pages.yml`. The workflow passes
+`enablement: true` to `actions/configure-pages`, so it switches Pages on by
+itself the first time it runs — there is nothing to set by hand.
 
 ## Not for navigation
 
