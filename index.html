@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grand Manan Tides</title>
+<meta name="description" content="Tide times and heights for Grand Manan Island, New Brunswick. Works offline.">
+<meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="GM Tides">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <h1>Grand Manan Tides</h1>
+      <p class="clock" id="clock">&nbsp;</p>
+    </div>
+    <label class="station-picker">
+      <span class="visually-hidden">Location</span>
+      <select id="station"></select>
+    </label>
+  </div>
+</header>
+
+<main id="main" hidden>
+
+  <!-- ── Right now ─────────────────────────────────────────────── -->
+  <section class="card hero" aria-labelledby="hero-heading">
+    <h2 id="hero-heading" class="visually-hidden">Right now</h2>
+
+    <div class="hero-state">
+      <span class="dir-badge" id="dir-badge" aria-hidden="true"></span>
+      <div class="hero-state-text">
+        <p class="dir-word" id="dir-word">&nbsp;</p>
+        <p class="dir-sub" id="dir-sub">&nbsp;</p>
+      </div>
+    </div>
+
+    <p class="countdown-label" id="countdown-label">&nbsp;</p>
+    <p class="countdown" id="countdown">&nbsp;</p>
+    <p class="countdown-detail" id="countdown-detail">&nbsp;</p>
+
+    <div class="meter" role="img" id="meter-fig" aria-label="">
+      <div class="meter-track"><div class="meter-fill" id="meter-fill"></div></div>
+      <div class="meter-ends">
+        <span id="meter-from">&nbsp;</span>
+        <span id="meter-to">&nbsp;</span>
+      </div>
+    </div>
+
+    <dl class="facts">
+      <div><dt>Level now</dt><dd id="fact-now">&nbsp;</dd></div>
+      <div><dt>Next high</dt><dd id="fact-high">&nbsp;</dd></div>
+      <div><dt>Next low</dt><dd id="fact-low">&nbsp;</dd></div>
+    </dl>
+  </section>
+
+  <!-- ── The curve ─────────────────────────────────────────────── -->
+  <section class="card chart-card" aria-labelledby="chart-heading">
+    <div class="card-head">
+      <div>
+        <h2 id="chart-heading">Next 36 hours</h2>
+        <p class="card-sub" id="chart-sub">Height above chart datum</p>
+      </div>
+    </div>
+    <div class="chart-wrap" id="chart-wrap">
+      <svg id="chart" role="img" aria-labelledby="chart-heading chart-desc"></svg>
+      <p id="chart-desc" class="visually-hidden"></p>
+      <div class="tooltip" id="tooltip" hidden></div>
+    </div>
+  </section>
+
+  <!-- ── Day by day ────────────────────────────────────────────── -->
+  <section class="card" aria-labelledby="days-heading">
+    <div class="card-head">
+      <div>
+        <h2 id="days-heading">Day by day</h2>
+        <p class="card-sub">Every high and low for the next two weeks</p>
+      </div>
+    </div>
+    <div id="days"></div>
+  </section>
+
+  <footer class="foot">
+    <p id="foot-station">&nbsp;</p>
+    <p>Times shown in Atlantic Time (the island's local time), from harmonic
+       constituents published in the XTide / OpenCPN dataset, which for Canadian
+       ports derives from Canadian Hydrographic Service analyses.</p>
+    <p><strong>Predictions only.</strong> Weather, wind and barometric pressure shift real
+       water levels. Do not use for navigation — carry the official
+       Canadian Tide and Current Tables for that.</p>
+    <p class="offline-hint">Saved for offline use. On iPhone, tap Share then
+       “Add to Home Screen” to keep it one tap away with no signal.</p>
+  </footer>
+</main>
+
+<p id="fallback" class="fallback">Loading tide predictions…</p>
+
+<script src="tide-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
