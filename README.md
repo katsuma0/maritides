@@ -62,6 +62,15 @@ Sanity checks that the output is right, not merely plausible:
 | Mean water level at North Head | ≈ 3.6 m | 3.56 m |
 | Spring tides | 1–2 days after new/full moon | 15–16 Jul, 13–14 Aug 2026 |
 
+### Known limitation
+
+The node factors and equilibrium arguments are tabulated per calendar year, and
+this switches tables at 00:00 UTC on 1 January rather than blending across the
+boundary the way XTide does. The resulting step in the curve is a few
+centimetres — below the 0.1 m the page displays, and far below the effect of
+weather — but a high or low falling within minutes of that instant can be
+reported slightly off. It has no effect during the rest of the year.
+
 ## Rebuilding the data
 
 ```sh

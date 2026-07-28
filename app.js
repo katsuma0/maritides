@@ -107,8 +107,9 @@
 
   /* ── Formatting ────────────────────────────────────────────── */
 
-  function metres(h) { return h.toFixed(1) + " m"; }
-  function feet(h) { return Math.round(h * 3.28084) + " ft"; }
+  /* +0 collapses -0, so a low a few millimetres under datum is not "-0.0 m". */
+  function metres(h) { return (h.toFixed(1) === "-0.0" ? 0 : +h.toFixed(1)).toFixed(1) + " m"; }
+  function feet(h) { return (Math.round(h * 3.28084) + 0) + " ft"; }
   function bothUnits(h) { return metres(h) + " / " + feet(h); }
 
   function duration(sec) {
@@ -136,7 +137,15 @@
 
   function recompute() {
     var now = Date.now() / 1000;
-    events = extremes(station, now - 2 * DAY, now + (FORECAST_DAYS + 1) * DAY);
+    events = extremes(station, now - 2 * DAY, now + (FORECAST_DAYS + 2) * DAY);
+  }
+
+  /* True while events[] still covers everything the UI wants to draw. A tab left
+     open for days must re-extend before the day list starts losing its tail. */
+  function eventsCover(now) {
+    return events.length > 0 &&
+      events[0].t < now - CHART_BACK &&
+      events[events.length - 1].t > now + FORECAST_DAYS * DAY + CHART_FWD;
   }
 
   /* ── Hero ──────────────────────────────────────────────────── */
@@ -200,6 +209,7 @@
 
   var SVG_NS = "http://www.w3.org/2000/svg";
   var chartGeom = null;
+  var chartCursor = null;   // the hover crosshair; a redraw detaches it
 
   function el(name, attrs) {
     var n = document.createElementNS(SVG_NS, name);
@@ -210,11 +220,15 @@
   function renderChart(now) {
     var svg = $("chart");
     var wrap = $("chart-wrap");
-    var W = Math.max(280, wrap.clientWidth);
-    var H = svg.clientHeight || 260;
+    // The viewBox must equal the rendered CSS size. Any mismatch makes the SVG
+    // scale-to-fit, which letterboxes the plot and offsets the hover readout.
+    var W = Math.round(wrap.clientWidth);
+    var H = Math.round(svg.getBoundingClientRect().height) || 260;
+    if (W < 1) return;   // container not laid out yet
     var pad = { t: 30, r: 12, b: 40, l: 32 };
 
     while (svg.firstChild) svg.removeChild(svg.firstChild);
+    chartCursor = null;  // the old crosshair node just got detached
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
 
     var t0 = now - CHART_BACK, t1 = now + CHART_FWD;
@@ -230,8 +244,11 @@
       if (h > hi) hi = h;
     }
     // Generous headroom top and bottom: the crest and trough labels live there.
+    // yMin is deliberately allowed below zero — clamping it at chart datum eats
+    // the bottom headroom on spring tides and drops the trough labels onto the
+    // hour axis. Gridlines still start at 0.
     var span = Math.max(0.5, hi - lo);
-    var yMin = Math.max(0, lo - span * 0.22), yMax = hi + span * 0.22;
+    var yMin = lo - span * 0.22, yMax = hi + span * 0.22;
 
     var X = function (t) { return pad.l + iw * (t - t0) / (t1 - t0); };
     var Y = function (h) { return pad.t + ih * (1 - (h - yMin) / (yMax - yMin)); };
@@ -239,7 +256,7 @@
 
     // Horizontal gridlines on clean metre values.
     var stepM = span > 6 ? 2 : 1;
-    for (var g = Math.ceil(yMin / stepM) * stepM; g <= yMax; g += stepM) {
+    for (var g = Math.max(0, Math.ceil(yMin / stepM) * stepM); g <= yMax; g += stepM) {
       svg.appendChild(el("line", {
         x1: pad.l, x2: W - pad.r, y1: Y(g), y2: Y(g),
         stroke: "var(--grid)", "stroke-width": 1
@@ -322,7 +339,11 @@
         x: tx, y: timeY, "text-anchor": anchor,
         fill: "var(--ink)", "font-size": 11, "font-weight": 640
       });
-      lab.textContent = clockTime(e.t).replace(/ [AP]M$/, "");
+      // Keep a compact meridiem: without it a 12:09 crest reads the same at
+      // midnight and noon, which is exactly the pair a tide chart must separate.
+      lab.textContent = clockTime(e.t).replace(/ ([AP])M$/, function (_, m) {
+        return m.toLowerCase();
+      });
       svg.appendChild(lab);
       var sub = el("text", {
         x: tx, y: heightY, "text-anchor": anchor,
@@ -349,7 +370,6 @@
 
   function bindTooltip() {
     var wrap = $("chart-wrap"), tip = $("tooltip"), svg = $("chart");
-    var cursor = null;
 
     function move(ev) {
       if (!chartGeom) return;
@@ -365,13 +385,21 @@
 
       tip.hidden = false;
       tip.innerHTML = "<b>" + clockTime(t) + "</b> · " + bothUnits(h);
-      tip.style.left = (x / scale) + "px";
+      // The bubble is centre-anchored (translateX(-50%)), so clamping its left
+      // coordinate alone still lets half of it hang past the edge — which clips
+      // it on the left and pushes horizontal page scroll on the right. Clamp
+      // against its measured half-width instead.
+      var half = tip.offsetWidth / 2 + 4;
+      tip.style.left = Math.min(r.width - half, Math.max(half, x / scale)) + "px";
       tip.style.top = cy + "px";
 
-      if (!cursor) {
-        cursor = el("g", {});
-        svg.appendChild(cursor);
+      // A redraw (the 30s tick, a resize, a station change) empties the SVG and
+      // nulls this out, so re-create rather than writing into a detached node.
+      if (!chartCursor || !chartCursor.parentNode) {
+        chartCursor = el("g", {});
+        svg.appendChild(chartCursor);
       }
+      var cursor = chartCursor;
       while (cursor.firstChild) cursor.removeChild(cursor.firstChild);
       cursor.appendChild(el("line", {
         x1: x, x2: x, y1: chartGeom.pad.t, y2: chartGeom.pad.t + chartGeom.ih,
@@ -385,8 +413,8 @@
 
     function hide() {
       tip.hidden = true;
-      if (cursor && cursor.parentNode) cursor.parentNode.removeChild(cursor);
-      cursor = null;
+      if (chartCursor && chartCursor.parentNode) chartCursor.parentNode.removeChild(chartCursor);
+      chartCursor = null;
     }
 
     wrap.addEventListener("pointermove", move);
@@ -402,10 +430,13 @@
     host.innerHTML = "";
     var todayKey = localParts(now).key;
     var dayStart = startOfLocalDay(now);
+    // Cut at the end of the last local day rather than a wall-clock now+14d, so
+    // the final row is a whole day instead of one chopped mid-afternoon.
+    var dayEnd = startOfLocalDay(dayStart + (FORECAST_DAYS - 1) * DAY + 12 * HOUR) + DAY;
     var byDay = {}, order = [];
 
     events.forEach(function (e) {
-      if (e.t < dayStart || e.t > now + FORECAST_DAYS * DAY) return;
+      if (e.t < dayStart || e.t >= dayEnd) return;
       var k = localParts(e.t).key;
       if (!byDay[k]) { byDay[k] = []; order.push(k); }
       byDay[k].push(e);
@@ -442,7 +473,7 @@
 
   function renderAll() {
     var now = Date.now() / 1000;
-    if (!events.length || now > events[events.length - 1].t - 2 * DAY) recompute();
+    if (!eventsCover(now)) recompute();
     renderHero(now);
     renderChart(now);
     renderDays(now);
@@ -502,9 +533,27 @@
     init();
   }
 
+  /* Only claim the page is available offline once a service worker actually
+     controls it — an unregistered or failed worker must not be advertised as
+     "saved", because the whole point is trusting it with no signal. */
+  function setOfflineHint(saved) {
+    var node = $("offline-hint");
+    if (!node) return;
+    node.textContent = saved
+      ? "Saved for offline use. On iPhone, tap Share then “Add to Home Screen” " +
+        "to keep it one tap away with no signal."
+      : "On iPhone, tap Share then “Add to Home Screen” to keep it one tap away.";
+  }
+
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js").catch(function () { /* offline is best-effort */ });
+      navigator.serviceWorker.register("sw.js").then(function () {
+        return navigator.serviceWorker.ready;
+      }).then(function () {
+        setOfflineHint(true);
+      }).catch(function () {
+        setOfflineHint(false);   // offline support is best-effort; say so honestly
+      });
     });
   }
 })();
