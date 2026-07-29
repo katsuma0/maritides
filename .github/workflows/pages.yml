@@ -23,7 +23,12 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      # enablement turns Pages on via the API if it is not configured yet, so a
+      # fresh repository deploys without anyone visiting the settings screen.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
