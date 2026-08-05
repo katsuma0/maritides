@@ -4,7 +4,7 @@
  * are cached the page works with no signal at all. Bump CACHE when any of them
  * changes so the new copy replaces the old one. */
 var PREFIX = "gm-tides-";
-var CACHE = PREFIX + "v2";
+var CACHE = PREFIX + "v3";
 var ASSETS = [
   "./",
   "./index.html",

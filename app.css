@@ -237,6 +237,7 @@ main { max-width: 860px; margin: 0 auto; padding: 1rem 1rem 2rem; }
 .foot { color: var(--ink-muted); font-size: .75rem; line-height: 1.55; padding: 0 .25rem; }
 .foot p { margin: 0 0 .6rem; }
 .foot strong { color: var(--ink-2); }
+.foot a { color: var(--ink-2); }
 .offline-hint { color: var(--ink-2); }
 
 @media (prefers-reduced-motion: reduce) {
