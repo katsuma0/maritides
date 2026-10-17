@@ -3,7 +3,7 @@
 A one-page tide viewer for the Maritimes — built to answer "is the tide coming in
 or going out, and when is the next high?" at a glance on a phone.
 
-Live site: **https://katsuma0.github.io/nb-tides/**
+Live site: **https://katsuma0.github.io/maritides/**
 
 - Coming in / going out, with a countdown to the next high or low.
 - A 30-hour tide curve with every crest and trough labelled, and a `NOW` marker.
