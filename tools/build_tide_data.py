@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Generate tide-data.js from the XTide/OpenCPN harmonic constants file.
 
-Source data: https://github.com/OpenCPN/OpenCPN/blob/master/data/tcdata/HARMONICS_NO_US
+Source data:
+  https://github.com/OpenCPN/OpenCPN/blob/master/data/tcdata/HARMONICS_NO_US
+  https://github.com/OpenCPN/OpenCPN/blob/master/data/tcdata/HARMONICS_NO_US.IDX
 (XTide harmonic constants, which for Canadian ports derive from Canadian
-Hydrographic Service analyses.)
+Hydrographic Service analyses. The .IDX file carries the station coordinates.)
 
 The prediction model matches XTide and OpenCPN exactly:
 
@@ -24,9 +26,9 @@ per-year arrays so the browser only has to evaluate the cosine sum:
     phase[year][i] = V0_i(year) - kappa_i
 
 Usage:
-    python3 tools/build_tide_data.py [path/to/HARMONICS_NO_US] [-o tide-data.js]
+    python3 tools/build_tide_data.py [dir-with-harmonics] [-o tide-data.js]
 
-If the harmonics file is absent it is downloaded from the OpenCPN repository.
+Missing source files are downloaded from the OpenCPN repository.
 """
 from __future__ import annotations
 
@@ -34,60 +36,116 @@ import argparse
 import json
 import math
 import os
+import re
 import sys
 import urllib.request
 
-HARMONICS_URL = (
-    "https://raw.githubusercontent.com/OpenCPN/OpenCPN/master/data/tcdata/HARMONICS_NO_US"
-)
+BASE_URL = "https://raw.githubusercontent.com/OpenCPN/OpenCPN/master/data/tcdata/"
+HARMONICS = "HARMONICS_NO_US"
+INDEX = "HARMONICS_NO_US.IDX"
 
 DEG2RAD = math.pi / 180.0
 # degrees/hour -> radians/second
 SPEED_SCALE = math.pi / 648000.0
 
-# Stations to publish, in menu order. The first one is the default.
+# Published stations, in menu order. The first is the default.
+#   record — the station name exactly as the harmonics file spells it
+#   name   — what the picker shows
+#   place  — a short locator shown under the chart
+#   group  — the <optgroup> it sits in
 STATIONS = [
-    {
-        "id": "north-head",
-        "record": "North Head, New Brunswick",
-        "name": "North Head",
-        "place": "Grand Manan Island",
-        "note": "Ferry terminal and main village",
-        "lat": 44.7667,
-        "lon": -66.75,
-    },
-    {
-        "id": "seal-cove",
-        "record": "Seal Cove, Grand Manan Island, New Brunswick",
-        "name": "Seal Cove",
-        "place": "Grand Manan Island",
-        "note": "South end of the island",
-        "lat": 44.65,
-        "lon": -66.85,
-    },
-    {
-        "id": "blacks-harbour",
-        "record": "Blacks Harbour, New Brunswick",
-        "name": "Blacks Harbour",
-        "place": "Mainland New Brunswick",
-        "note": "Mainland end of the Grand Manan ferry",
-        "lat": 45.05,
-        "lon": -66.7833,
-    },
+    # The island itself.
+    dict(id="north-head", record="North Head, New Brunswick",
+         name="North Head", place="Grand Manan Island", group="Grand Manan"),
+    dict(id="seal-cove", record="Seal Cove, Grand Manan Island, New Brunswick",
+         name="Seal Cove", place="Grand Manan Island", group="Grand Manan"),
+
+    # Getting there, and the rest of Charlotte County.
+    dict(id="blacks-harbour", record="Blacks Harbour, New Brunswick",
+         name="Blacks Harbour", place="Grand Manan ferry terminal",
+         group="Passamaquoddy Bay"),
+    dict(id="st-andrews", record="St. Andrews, Passamaquoddy Bay, New Brunswick",
+         name="St. Andrews", place="Passamaquoddy Bay", group="Passamaquoddy Bay"),
+    dict(id="beaver-harbour", record="Beaver Harbour, New Brunswick",
+         name="Beaver Harbour", place="Charlotte County", group="Passamaquoddy Bay"),
+    dict(id="campobello", record="Welshpool, Campobello Island, New Brunswick",
+         name="Campobello", place="Welshpool", group="Passamaquoddy Bay"),
+
+    # The big Fundy tides.
+    dict(id="saint-john", record="Saint John, New Brunswick",
+         name="Saint John", place="New Brunswick", group="Bay of Fundy"),
+    dict(id="st-martins", record="St. Martins, New Brunswick",
+         name="St. Martins", place="Sea caves, New Brunswick", group="Bay of Fundy"),
+    dict(id="hopewell-rocks", record="Hopewell Cape, New Brunswick",
+         name="Hopewell Rocks", place="Hopewell Cape, New Brunswick",
+         group="Bay of Fundy"),
+    dict(id="fundy-park", record="Herring Cove, New Brunswick",
+         name="Fundy Park", place="Herring Cove, New Brunswick",
+         group="Bay of Fundy"),
+    dict(id="burntcoat-head", record="Burntcoat Head, Nova Scotia",
+         name="Burntcoat Head", place="World's highest tides, Nova Scotia",
+         group="Bay of Fundy"),
+    dict(id="digby", record="Digby, Annapolis Basin, Nova Scotia",
+         name="Digby", place="Annapolis Basin, Nova Scotia", group="Bay of Fundy"),
+
+    # Atlantic-facing Nova Scotia.
+    dict(id="halifax", record="Halifax, Nova Scotia",
+         name="Halifax", place="Nova Scotia", group="Atlantic Coast"),
+    dict(id="lunenburg", record="Lunenburg, Nova Scotia",
+         name="Lunenburg", place="Nova Scotia", group="Atlantic Coast"),
+    dict(id="yarmouth", record="Yarmouth, Nova Scotia",
+         name="Yarmouth", place="Nova Scotia", group="Atlantic Coast"),
+    dict(id="sydney", record="Sydney, Nova Scotia",
+         name="Sydney", place="Cape Breton, Nova Scotia", group="Atlantic Coast"),
+
+    # The warm side.
+    dict(id="shediac", record="Shediac Bay, New Brunswick",
+         name="Shediac", place="Parlee Beach, New Brunswick",
+         group="Northumberland Strait"),
+    dict(id="charlottetown", record="Charlottetown, Prince Edward Island",
+         name="Charlottetown", place="Prince Edward Island",
+         group="Northumberland Strait"),
+    dict(id="summerside", record="Summerside, Prince Edward Island",
+         name="Summerside", place="Prince Edward Island",
+         group="Northumberland Strait"),
+    dict(id="pictou", record="Pictou, Nova Scotia",
+         name="Pictou", place="Nova Scotia", group="Northumberland Strait"),
 ]
 
 FIRST_YEAR = 2026
 LAST_YEAR = 2037
 
 
-def read_harmonics(path: str) -> list[str]:
+def fetch(directory: str, filename: str) -> str:
+    path = os.path.join(directory, filename)
     if not os.path.exists(path):
-        sys.stderr.write(f"downloading harmonic constants to {path} ...\n")
-        with urllib.request.urlopen(HARMONICS_URL) as r, open(path, "wb") as f:
+        os.makedirs(directory, exist_ok=True)
+        sys.stderr.write(f"downloading {filename} to {path} ...\n")
+        with urllib.request.urlopen(BASE_URL + filename) as r, open(path, "wb") as f:
             f.write(r.read())
+    return path
+
+
+def read_harmonics(path: str) -> list[str]:
     with open(path, encoding="utf-8") as f:
         raw = f.read().split("\n")
     return [l for l in raw if not l.lstrip().startswith("#") and l.strip() != ""]
+
+
+# "TNAA:Can:Newb: -66.75 44.7667 -4:0 North Head, New Brunswick"
+IDX_LINE = re.compile(r"^T\S*\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(\S+)\s+(.+?)\s*$")
+
+
+def read_index(path: str) -> dict[str, tuple[float, float]]:
+    """Map reference-station name -> (lat, lon). The IDX lists lon before lat."""
+    coords: dict[str, tuple[float, float]] = {}
+    with open(path, encoding="latin-1") as f:
+        for line in f:
+            m = IDX_LINE.match(line)
+            if m:
+                lon, lat, _tz, name = m.groups()
+                coords.setdefault(name, (float(lat), float(lon)))
+    return coords
 
 
 def parse(lines: list[str]) -> dict:
@@ -178,17 +236,21 @@ def hhmm_to_seconds(text: str) -> int:
     return int(hh) * 3600 + sign * int(mm) * 60
 
 
-def build_station(spec: dict, tables: dict, records: dict) -> dict:
+def build_station(spec: dict, tables: dict, records: dict, coords: dict) -> dict:
     rec = records.get(spec["record"])
     if rec is None:
         raise KeyError(f"station not found in harmonics file: {spec['record']}")
+    if spec["record"] not in coords:
+        raise KeyError(f"station not found in index: {spec['record']}")
+    lat, lon = coords[spec["record"]]
 
     datum_value, datum_units = rec["datum"].split()[:2]
     if datum_units != "meters":
         raise ValueError(f"{spec['record']}: expected meters, got {datum_units}")
 
     meridian_text = rec["meridian"].split()[0]
-    tzfile = rec["meridian"].split()[1].lstrip(":") if len(rec["meridian"].split()) > 1 else "UTC"
+    parts = rec["meridian"].split()
+    tzfile = parts[1].lstrip(":") if len(parts) > 1 else "UTC"
 
     names, speeds, amps, kappas = [], [], [], []
     for cname in tables["order"]:
@@ -218,10 +280,10 @@ def build_station(spec: dict, tables: dict, records: dict) -> dict:
         "id": spec["id"],
         "name": spec["name"],
         "place": spec["place"],
-        "note": spec["note"],
+        "group": spec["group"],
         "source": rec["name"],
-        "lat": spec["lat"],
-        "lon": spec["lon"],
+        "lat": round(lat, 4),
+        "lon": round(lon, 4),
         "timezone": tzfile,
         "meridian": hhmm_to_seconds(meridian_text),
         "datum": float(datum_value),
@@ -233,13 +295,15 @@ def build_station(spec: dict, tables: dict, records: dict) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("harmonics", nargs="?", default="HARMONICS_NO_US")
+    ap.add_argument("source_dir", nargs="?", default=".",
+                    help="directory holding (or to receive) the OpenCPN data files")
     ap.add_argument("-o", "--output", default="tide-data.js")
     args = ap.parse_args()
 
-    tables = parse(read_harmonics(args.harmonics))
+    tables = parse(read_harmonics(fetch(args.source_dir, HARMONICS)))
+    coords = read_index(fetch(args.source_dir, INDEX))
     records = {st["name"]: st for st in iter_stations(tables["station_lines"], tables["order"])}
-    stations = [build_station(spec, tables, records) for spec in STATIONS]
+    stations = [build_station(spec, tables, records, coords) for spec in STATIONS]
 
     payload = {
         "firstYear": FIRST_YEAR,
@@ -257,13 +321,15 @@ def main() -> int:
         f.write(body)
         f.write(";\n")
 
+    group = None
     for st in stations:
-        print(
-            f"{st['name']:16s} {len(st['constituents']):3d} constituents  "
-            f"datum {st['datum']:.2f} m  tz {st['timezone']}"
-        )
+        if st["group"] != group:
+            group = st["group"]
+            print(f"  {group}")
+        print(f"    {st['name']:18s} {len(st['constituents']):3d} consts  "
+              f"datum {st['datum']:5.2f} m  {st['lat']:.3f},{st['lon']:.3f}  {st['timezone']}")
     print(f"wrote {args.output} ({os.path.getsize(args.output)} bytes), "
-          f"years {FIRST_YEAR}-{LAST_YEAR}")
+          f"{len(stations)} stations, years {FIRST_YEAR}-{LAST_YEAR}")
     return 0
 
 

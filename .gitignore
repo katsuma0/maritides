@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+
+# Local copies of the OpenCPN source data (downloaded on demand).
+HARMONICS_NO_US
+HARMONICS_NO_US.IDX
