@@ -16,7 +16,7 @@
   var DATA = window.TIDE_DATA;
   var TZ = DATA.timezone; // America/Halifax
   var HOUR = 3600, DAY = 86400;
-  var FORECAST_DAYS = 14;
+  var FORECAST_DAYS = 31;
   var CHART_BACK = 6 * HOUR, CHART_FWD = 30 * HOUR;
 
   /* ── Prediction ────────────────────────────────────────────── */
@@ -169,10 +169,7 @@
 
     $("dir-badge").textContent = rising ? "↑" : "↓";
     $("dir-badge").className = "dir-badge" + (rising ? "" : " is-falling");
-    $("dir-word").textContent = rising ? "The tide is coming in" : "The tide is going out";
-    $("dir-sub").textContent = rising
-      ? "Water is rising toward high tide"
-      : "Water is falling toward low tide";
+    $("dir-word").textContent = rising ? "Coming in" : "Going out";
 
     $("countdown-label").textContent = next.kind === "high" ? "High tide in" : "Low tide in";
     $("countdown").textContent = duration(next.t - now);
@@ -255,7 +252,12 @@
     chartGeom = { t0: t0, t1: t1, X: X, Y: Y, pad: pad, W: W, H: H, iw: iw, ih: ih };
 
     // Horizontal gridlines on clean metre values.
-    var stepM = span > 6 ? 2 : 1;
+    // Measured against the drawn range, not the tide range, so no station
+    // crowds the axis: Sydney swings 1.3 m, Burntcoat Head 15 m.
+    var ladder = [0.5, 1, 2, 5], stepM = ladder[ladder.length - 1];
+    for (var li = 0; li < ladder.length; li++) {
+      if ((yMax - yMin) / ladder[li] <= 10) { stepM = ladder[li]; break; }
+    }
     for (var g = Math.max(0, Math.ceil(yMin / stepM) * stepM); g <= yMax; g += stepM) {
       svg.appendChild(el("line", {
         x1: pad.l, x2: W - pad.r, y1: Y(g), y2: Y(g),
@@ -266,7 +268,7 @@
         fill: "var(--ink-muted)", "font-size": 10
       });
       lbl.style.fontVariantNumeric = "tabular-nums";
-      lbl.textContent = g + "m";
+      lbl.textContent = (stepM < 1 ? g.toFixed(1) : g) + "m";
       svg.appendChild(lbl);
     }
 
@@ -456,12 +458,16 @@
       var evs = document.createElement("div");
       evs.className = "events";
       list.forEach(function (e) {
+        var high = e.kind === "high";
         var chip = document.createElement("span");
-        chip.className = "event" + (e.kind === "high" ? " is-high" : "") +
+        chip.className = "event" + (high ? " is-high" : " is-low") +
           (e.t < now ? " is-past" : "");
-        chip.innerHTML = '<span class="tag">' + (e.kind === "high" ? "High" : "Low") +
-          '</span><span class="t">' + clockTime(e.t) +
-          '</span><span class="h">' + e.h.toFixed(1) + "m</span>";
+        // An arrow rather than the word: four of these have to fit one phone row.
+        chip.innerHTML =
+          '<span class="t"><i aria-hidden="true">' + (high ? "\u25b2" : "\u25bc") +
+          '</i>' + clockTime(e.t).replace(" AM", "a").replace(" PM", "p") +
+          '</span><span class="h">' + e.h.toFixed(1) + "m</span>" +
+          '<span class="visually-hidden">' + (high ? "high" : "low") + " tide</span>";
         evs.appendChild(chip);
       });
       row.appendChild(evs);
@@ -477,21 +483,28 @@
     renderHero(now);
     renderChart(now);
     renderDays(now);
-    $("chart-sub").textContent =
-      station.name + ", " + station.place + " · metres above chart datum";
+    $("chart-sub").textContent = station.place;
+    $("days-sub").textContent =
+      fmtDayMon.format(now * 1000) + " – " + fmtDayMon.format((now + (FORECAST_DAYS - 1) * DAY) * 1000);
     $("foot-station").textContent =
       "Predictions for " + station.source + " (" + station.lat.toFixed(3) + "°N, " +
       Math.abs(station.lon).toFixed(3) + "°W). Heights are metres above chart datum.";
   }
 
   function init() {
-    var sel = $("station");
+    var sel = $("station"), groups = {};
     DATA.stations.forEach(function (s, i) {
+      var holder = groups[s.group];
+      if (!holder) {
+        holder = groups[s.group] = document.createElement("optgroup");
+        holder.label = s.group;
+        sel.appendChild(holder);
+      }
       var o = document.createElement("option");
       o.value = s.id;
       o.textContent = s.name;
       if (i === 0) o.selected = true;
-      sel.appendChild(o);
+      holder.appendChild(o);
     });
 
     var saved = null;
