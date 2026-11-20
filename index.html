@@ -3,25 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Maritime Tides</title>
-<meta name="description" content="Live tide times for New Brunswick, Nova Scotia and PEI. Works offline.">
+<title>Maritides</title>
+<meta name="description" content="Maritides — a real-time tide tracker for the Bay of Fundy and nearby areas. Works offline.">
 <meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Tides">
+<meta name="apple-mobile-web-app-title" content="Maritides">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
 
 <header class="topbar">
   <div class="topbar-inner">
-    <label class="station-picker">
-      <span class="visually-hidden">Location</span>
-      <select id="station"></select>
-    </label>
+    <div class="topbar-row">
+      <label class="station-picker">
+        <span class="visually-hidden">Location</span>
+        <select id="station"></select>
+      </label>
+      <div class="units" id="units" role="group" aria-label="Height units">
+        <button type="button" data-unit="m" aria-pressed="true">m</button>
+        <button type="button" data-unit="ft" aria-pressed="false">ft</button>
+      </div>
+    </div>
     <p class="clock" id="clock">&nbsp;</p>
   </div>
 </header>
@@ -79,9 +85,9 @@
   </section>
 
   <footer class="foot">
-    <p id="foot-station">&nbsp;</p>
-    <p>Atlantic Time. Heights in metres above chart datum.
-       Predictions only — wind and pressure move real water. Not for navigation.</p>
+    <p class="about">During my annual trip to St. Andrews, New Brunswick with my family
+       to go fishing, I created Maritides — a real-time tide tracker for the Bay of
+       Fundy and nearby areas.</p>
     <p class="offline-hint" id="offline-hint">On iPhone: Share → Add to Home Screen.</p>
     <p><a href="https://katsuma.ca/">katsuma.ca</a></p>
   </footer>

@@ -1,7 +1,7 @@
 {
-  "name": "Maritime Tides",
-  "short_name": "Tides",
-  "description": "Live tide times for New Brunswick, Nova Scotia and PEI. Works offline.",
+  "name": "Maritides",
+  "short_name": "Maritides",
+  "description": "A real-time tide tracker for the Bay of Fundy and nearby areas. Works offline.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

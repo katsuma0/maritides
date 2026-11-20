@@ -19,6 +19,12 @@
   --rising:          #2a78d6;   /* blue  */
   --falling:         #eb6834;   /* orange */
 
+  /* Segmented control: the selected pill must read as nearer the eye than its
+     track in BOTH themes, which a single surface colour cannot do. */
+  --seg-track:   rgba(11, 11, 11, 0.06);
+  --seg-on:      #ffffff;
+  --seg-shadow:  0 1px 2px rgba(11, 11, 11, .14);
+
   --shadow: 0 1px 2px rgba(11,11,11,.04), 0 6px 20px rgba(11,11,11,.05);
   --radius: 16px;
   --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -40,6 +46,10 @@
     --series-soft: #184f95;
     --rising:      #3987e5;
     --falling:     #d95926;
+
+    --seg-track:   rgba(255, 255, 255, 0.07);
+    --seg-on:      rgba(255, 255, 255, 0.22);
+    --seg-shadow:  none;
 
     --shadow: 0 1px 2px rgba(0,0,0,.5), 0 6px 20px rgba(0,0,0,.35);
   }
@@ -77,15 +87,35 @@ body {
 }
 .topbar-inner {
   max-width: 860px; margin: 0 auto;
-  padding: .55rem 1rem;
-  display: flex; align-items: center; gap: .75rem;
+  padding: .5rem 1rem .45rem;
+}
+.topbar-row {
+  display: flex; align-items: center; gap: .6rem;
   justify-content: space-between;
 }
 .clock {
-  margin: 0; font-size: .8125rem; color: var(--ink-muted);
-  white-space: nowrap; text-align: right;
+  margin: .2rem 0 0; font-size: .75rem; color: var(--ink-muted);
+  white-space: nowrap;
 }
-@media (max-width: 360px) { .clock { font-size: .75rem; } }
+
+/* m / ft — a segmented pair, so the current unit is visible without opening it. */
+.units {
+  flex: none; display: flex;
+  background: var(--seg-track);
+  border-radius: 10px; padding: 2px;
+}
+.units button {
+  font: inherit; font-size: .8125rem; font-weight: 620;
+  color: var(--ink-muted); background: none; border: 0;
+  border-radius: 8px; padding: .3rem .6rem;
+  min-width: 2.25rem; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.units button.is-on {
+  color: var(--ink); background: var(--seg-on);
+  box-shadow: var(--seg-shadow);
+}
+.units button:focus-visible { outline: 2px solid var(--series); outline-offset: 1px; }
 
 .station-picker { min-width: 0; flex: 1 1 auto; }
 .station-picker select {
@@ -230,6 +260,10 @@ main { max-width: 860px; margin: 0 auto; padding: 1rem 1rem 2rem; }
 /* ── Footer ──────────────────────────────────────────────────── */
 .foot { color: var(--ink-muted); font-size: .75rem; line-height: 1.55; padding: 0 .25rem; }
 .foot p { margin: 0 0 .6rem; }
+.foot .about {
+  color: var(--ink-2); font-size: .8125rem; line-height: 1.6;
+  margin-bottom: .75rem;
+}
 .foot strong { color: var(--ink-2); }
 .foot a { color: var(--ink-2); }
 .offline-hint { color: var(--ink-2); }
