@@ -99,13 +99,20 @@ reported slightly off. It has no effect during the rest of the year.
 
 ```sh
 python3 tools/build_tide_data.py      # downloads the harmonics file if absent
-python3 tools/make_icons.py           # regenerates icon.svg and the PNGs
 ```
 
-Both scripts use only the Python standard library and download the source data
-if it is absent. Edit `STATIONS` in `build_tide_data.py` to add a location (the
-`record` field must match the harmonics file's spelling exactly), or
-`FIRST_YEAR` / `LAST_YEAR` to change the span.
+It uses only the Python standard library and downloads the source data if it is
+absent. Edit `STATIONS` in `build_tide_data.py` to add a location (the `record`
+field must match the harmonics file's spelling exactly), or `FIRST_YEAR` /
+`LAST_YEAR` to change the span.
+
+## Icons
+
+`icon-32.png` (browser tab), `apple-touch-icon.png`, `icon-192.png` and
+`icon-512.png` are cut from one supplied image rather than generated, so there
+is no script to re-run — replacing them means replacing the files. The tab icon
+keeps its transparent background; the home-screen sizes are flattened onto
+white, because iOS composites transparency to black.
 
 ## Deploying
 
