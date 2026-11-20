@@ -109,9 +109,19 @@ if it is absent. Edit `STATIONS` in `build_tide_data.py` to add a location (the
 
 ## Deploying
 
-Pushes to `main` publish via `.github/workflows/pages.yml`. The workflow passes
-`enablement: true` to `actions/configure-pages`, so it switches Pages on by
-itself the first time it runs — there is nothing to set by hand.
+GitHub Pages is set to **Deploy from a branch**, so GitHub's own builder
+publishes the configured branch on every push to it — no workflow in this
+repository is involved.
+
+There was an `actions/deploy-pages` workflow here. It could never have worked:
+that action only publishes to a Pages site whose build type is `workflow`, and
+this site's is `legacy` because it deploys from a branch. It failed on all six
+of its runs and was removed.
+
+To publish from `main` instead, point **Settings → Pages → Branch** at `main`.
+To go back to an Actions-based deploy, switch **Settings → Pages → Source** to
+**GitHub Actions**, which sets the build type the action needs; GitHub offers a
+starter workflow at that point.
 
 ## Not for navigation
 
