@@ -1,16 +1,20 @@
-# Maritime Tides
+# Maritides
 
-A one-page tide viewer for the Maritimes — built to answer "is the tide coming in
-or going out, and when is the next high?" at a glance on a phone.
+> During my annual trip to St. Andrews, New Brunswick with my family to go
+> fishing, I created Maritides — a real-time tide tracker for the Bay of Fundy
+> and nearby areas.
+
+A one-page tide viewer — built to answer "is the tide coming in or going out, and
+when is the next high?" at a glance on a phone.
 
 Live site: **https://katsuma0.github.io/maritides/**
 
 - Coming in / going out, with a countdown to the next high or low.
 - A 30-hour tide curve with every crest and trough labelled, and a `NOW` marker.
 - Every high and low for the next **31 days**, four to a line.
-- **20 locations**, from Grand Manan to Cape Breton.
-- Metres and feet, always in Atlantic Time — no matter what time zone the phone
-  thinks it is in.
+- **20 locations**, from Grand Manan to Cape Breton; St. Andrews by default.
+- **Metres or feet**, your choice, remembered between visits.
+- Always in Atlantic Time — no matter what time zone the phone thinks it is in.
 
 | Region | Locations |
 |---|---|

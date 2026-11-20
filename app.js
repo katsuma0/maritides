@@ -105,12 +105,23 @@
     return t;
   }
 
-  /* ── Formatting ────────────────────────────────────────────── */
+  /* ── Units ─────────────────────────────────────────────────── */
+
+  /* Heights are stored in metres; only the display converts. Each unit brings
+     its own gridline ladder, because 2 m and 2 ft are not the same decision. */
+  var UNITS = {
+    m:  { label: "m",  perMetre: 1,       ladder: [0.1, 0.2, 0.5, 1, 2, 5] },
+    ft: { label: "ft", perMetre: 3.28084, ladder: [0.5, 1, 2, 5, 10, 20] }
+  };
+  var units = "m";
+
+  function conv(h) { return h * UNITS[units].perMetre; }
 
   /* +0 collapses -0, so a low a few millimetres under datum is not "-0.0 m". */
-  function metres(h) { return (h.toFixed(1) === "-0.0" ? 0 : +h.toFixed(1)).toFixed(1) + " m"; }
-  function feet(h) { return (Math.round(h * 3.28084) + 0) + " ft"; }
-  function bothUnits(h) { return metres(h) + " / " + feet(h); }
+  function round1(v) { return (v.toFixed(1) === "-0.0" ? 0 : +v.toFixed(1)).toFixed(1); }
+
+  function height(h) { return round1(conv(h)) + " " + UNITS[units].label; }
+  function heightTight(h) { return round1(conv(h)) + UNITS[units].label; }
 
   function duration(sec) {
     var m = Math.max(0, Math.round(sec / 60));
@@ -131,7 +142,16 @@
 
   /* ── State ─────────────────────────────────────────────────── */
 
-  var station = DATA.stations[0];
+  var DEFAULT_STATION = "st-andrews";
+
+  function stationById(id) {
+    for (var i = 0; i < DATA.stations.length; i++) {
+      if (DATA.stations[i].id === id) return DATA.stations[i];
+    }
+    return null;
+  }
+
+  var station = stationById(DEFAULT_STATION) || DATA.stations[0];
   var events = [];
   var $ = function (id) { return document.getElementById(id); };
 
@@ -174,7 +194,7 @@
     $("countdown-label").textContent = next.kind === "high" ? "High tide in" : "Low tide in";
     $("countdown").textContent = duration(next.t - now);
     $("countdown-detail").textContent =
-      "at " + clockTime(next.t) + " · " + bothUnits(next.h);
+      "at " + clockTime(next.t) + " · " + height(next.h);
 
     if (prev) {
       var frac = (now - prev.t) / (next.t - prev.t);
@@ -188,14 +208,14 @@
         durationWords(next.t - now) + " until " + next.kind + " tide.");
     }
 
-    $("fact-now").innerHTML = metres(h) + "<small>" + feet(h) + "</small>";
+    $("fact-now").innerHTML = height(h) + "<small>above datum</small>";
     if (nextHigh) {
       $("fact-high").innerHTML = clockTime(nextHigh.t) +
-        "<small>" + metres(nextHigh.h) + " · " + duration(nextHigh.t - now) + "</small>";
+        "<small>" + height(nextHigh.h) + " · " + duration(nextHigh.t - now) + "</small>";
     }
     if (nextLow) {
       $("fact-low").innerHTML = clockTime(nextLow.t) +
-        "<small>" + metres(nextLow.h) + " · " + duration(nextLow.t - now) + "</small>";
+        "<small>" + height(nextLow.h) + " · " + duration(nextLow.t - now) + "</small>";
     }
 
     $("clock").textContent =
@@ -254,21 +274,23 @@
     // Horizontal gridlines on clean metre values.
     // Measured against the drawn range, not the tide range, so no station
     // crowds the axis: Sydney swings 1.3 m, Burntcoat Head 15 m.
-    var ladder = [0.5, 1, 2, 5], stepM = ladder[ladder.length - 1];
+    var ladder = UNITS[units].ladder, step = ladder[ladder.length - 1];
+    var loD = conv(yMin), hiD = conv(yMax);
     for (var li = 0; li < ladder.length; li++) {
-      if ((yMax - yMin) / ladder[li] <= 10) { stepM = ladder[li]; break; }
+      if ((hiD - loD) / ladder[li] <= 10) { step = ladder[li]; break; }
     }
-    for (var g = Math.max(0, Math.ceil(yMin / stepM) * stepM); g <= yMax; g += stepM) {
+    for (var g = Math.max(0, Math.ceil(loD / step) * step); g <= hiD; g += step) {
+      var gm = g / UNITS[units].perMetre;   // back to metres to position it
       svg.appendChild(el("line", {
-        x1: pad.l, x2: W - pad.r, y1: Y(g), y2: Y(g),
+        x1: pad.l, x2: W - pad.r, y1: Y(gm), y2: Y(gm),
         stroke: "var(--grid)", "stroke-width": 1
       }));
       var lbl = el("text", {
-        x: pad.l - 7, y: Y(g) + 4, "text-anchor": "end",
+        x: pad.l - 7, y: Y(gm) + 4, "text-anchor": "end",
         fill: "var(--ink-muted)", "font-size": 10
       });
       lbl.style.fontVariantNumeric = "tabular-nums";
-      lbl.textContent = (stepM < 1 ? g.toFixed(1) : g) + "m";
+      lbl.textContent = (step < 1 ? g.toFixed(1) : Math.round(g)) + UNITS[units].label;
       svg.appendChild(lbl);
     }
 
@@ -351,7 +373,7 @@
         x: tx, y: heightY, "text-anchor": anchor,
         fill: "var(--ink-muted)", "font-size": 10
       });
-      sub.textContent = e.h.toFixed(1) + "m";
+      sub.textContent = heightTight(e.h);
       svg.appendChild(sub);
     });
 
@@ -364,7 +386,7 @@
     var inWindow = events.filter(function (e) { return e.t >= t0 && e.t <= t1; });
     $("chart-desc").textContent = "Tide curve for " + station.name + ". " +
       inWindow.map(function (e) {
-        return e.kind + " tide " + clockTime(e.t) + " at " + metres(e.h);
+        return e.kind + " tide " + clockTime(e.t) + " at " + height(e.h);
       }).join("; ") + ".";
   }
 
@@ -386,7 +408,7 @@
       var cy = chartGeom.Y(h) / scale;
 
       tip.hidden = false;
-      tip.innerHTML = "<b>" + clockTime(t) + "</b> · " + bothUnits(h);
+      tip.innerHTML = "<b>" + clockTime(t) + "</b> · " + height(h);
       // The bubble is centre-anchored (translateX(-50%)), so clamping its left
       // coordinate alone still lets half of it hang past the edge — which clips
       // it on the left and pushes horizontal page scroll on the right. Clamp
@@ -466,7 +488,7 @@
         chip.innerHTML =
           '<span class="t"><i aria-hidden="true">' + (high ? "\u25b2" : "\u25bc") +
           '</i>' + clockTime(e.t).replace(" AM", "a").replace(" PM", "p") +
-          '</span><span class="h">' + e.h.toFixed(1) + "m</span>" +
+          '</span><span class="h">' + heightTight(e.h) + "</span>" +
           '<span class="visually-hidden">' + (high ? "high" : "low") + " tide</span>";
         evs.appendChild(chip);
       });
@@ -486,9 +508,6 @@
     $("chart-sub").textContent = station.place;
     $("days-sub").textContent =
       fmtDayMon.format(now * 1000) + " – " + fmtDayMon.format((now + (FORECAST_DAYS - 1) * DAY) * 1000);
-    $("foot-station").textContent =
-      "Predictions for " + station.source + " (" + station.lat.toFixed(3) + "°N, " +
-      Math.abs(station.lon).toFixed(3) + "°W). Heights are metres above chart datum.";
   }
 
   function init() {
@@ -503,19 +522,19 @@
       var o = document.createElement("option");
       o.value = s.id;
       o.textContent = s.name;
-      if (i === 0) o.selected = true;
+      if (s.id === station.id) o.selected = true;
       holder.appendChild(o);
     });
 
     var saved = null;
     try { saved = localStorage.getItem("gm-tides-station"); } catch (e) { /* private mode */ }
     if (saved) {
-      var match = DATA.stations.filter(function (s) { return s.id === saved; })[0];
+      var match = stationById(saved);
       if (match) { station = match; sel.value = saved; }
     }
 
     sel.addEventListener("change", function () {
-      station = DATA.stations.filter(function (s) { return s.id === sel.value; })[0] || DATA.stations[0];
+      station = stationById(sel.value) || station;
       try { localStorage.setItem("gm-tides-station", station.id); } catch (e) { /* ignore */ }
       recompute();
       renderAll();
@@ -523,6 +542,28 @@
 
     // Reveal before the first render: the chart sizes itself from the
     // container, which measures zero while `main` is still hidden.
+    var savedUnits = null;
+    try { savedUnits = localStorage.getItem("gm-tides-units"); } catch (e) { /* private mode */ }
+    if (savedUnits && UNITS[savedUnits]) units = savedUnits;
+
+    var unitButtons = [].slice.call(document.querySelectorAll("#units button"));
+    function paintUnits() {
+      unitButtons.forEach(function (btn) {
+        var on = btn.getAttribute("data-unit") === units;
+        btn.classList.toggle("is-on", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    }
+    unitButtons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        units = btn.getAttribute("data-unit");
+        try { localStorage.setItem("gm-tides-units", units); } catch (e) { /* ignore */ }
+        paintUnits();
+        renderAll();
+      });
+    });
+    paintUnits();
+
     $("fallback").hidden = true;
     $("main").hidden = false;
 
@@ -553,9 +594,8 @@
     var node = $("offline-hint");
     if (!node) return;
     node.textContent = saved
-      ? "Saved for offline use. On iPhone, tap Share then “Add to Home Screen” " +
-        "to keep it one tap away with no signal."
-      : "On iPhone, tap Share then “Add to Home Screen” to keep it one tap away.";
+      ? "Saved for offline use. On iPhone: Share → Add to Home Screen."
+      : "On iPhone: Share → Add to Home Screen.";
   }
 
   if ("serviceWorker" in navigator) {
